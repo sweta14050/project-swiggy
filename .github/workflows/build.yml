@@ -34,7 +34,7 @@ jobs:
       - name: Docker build and push
         run: |
           # Run commands to build and push Docker images
-            aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/o1h6f0q2  
-            docker build -t swigy-project -f deployment-using-github-actions/Dockerfile deployment-using-github-actions
-            docker tag swigy-project:latest public.ecr.aws/o1h6f0q2/swigy-project:latest
-            docker push public.ecr.aws/o1h6f0q2/swigy-project:latest
+            aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/c3v1w0b3 
+            docker build -t my-repo .
+            docker tag my-repo:latest public.ecr.aws/c3v1w0b3/my-repo:latest
+            docker push public.ecr.aws/c3v1w0b3/my-repo:latest
