@@ -67,7 +67,7 @@ jobs:
         run: docker pull public.ecr.aws/c3v1w0b3/my-repo:latest
 
       - name: Image scan
-        run: trivy image public.ecr.aws/c3v1w0b3/my-repo:latest > trivyimagedeploy.txt
+        run: image public.ecr.aws/c3v1w0b3/my-repo:latest > trivyimagedeploy.txt
 
       - name: Stop and remove existing container
         run: |
