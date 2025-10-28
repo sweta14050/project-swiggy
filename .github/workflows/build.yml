@@ -1,9 +1,57 @@
-deploy:
-    name: Deploy
-    needs: build
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=my-swiggy-key
+            -Dsonar.projectName=my-swiggy
+            -Dsonar.sources=.
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Docker build and push to ECR
+        run: |
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/c3v1w0b3
+          docker build -t my-repo -f deployment-using-github-actions/Dockerfile deployment-using-github-actions/
+          docker tag my-repo:latest public.ecr.aws/c3v1w0b3/my-repo:latest
+          docker push public.ecr.aws/c3v1w0b3/my-repo:latest
+        env:
+          DOCKER_CLI_ACI: 1
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -19,7 +67,18 @@ deploy:
         run: docker pull public.ecr.aws/c3v1w0b3/my-repo:latest
 
       - name: Image scan
-        run: trivy image public.ecr.aws/c3v1w0b3/my-repo:latest
+        run: trivy image public.ecr.aws/c3v1w0b3/my-repo:latest > trivyimagedeploy.txt
 
-      - name: Deploy to container
-        run: docker run -d --name swiggy-clone -p 3000:3000 254539707241.dkr.ecr.us-east-1.amazonaws.com/my-ecr:latest
+      - name: Stop and remove existing container
+        run: |
+          docker stop swiggy-clone || true
+          docker rm swiggy-clone || true
+
+      - name: Deploy to local container
+        run: docker run -d --name swiggy-clone -p 3000:3000 public.ecr.aws/c3v1w0b3/my-repo:latest
+
+      - name: Update kubeconfig
+        run: aws eks --region us-east-1 update-kubeconfig --name EKS_CLOUD
+
+      - name: Deploy to Kubernetes
+        run: kubectl apply -f deployment-using-github-actions/deployment-service.yml --validate=false
