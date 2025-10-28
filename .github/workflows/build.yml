@@ -1,76 +1,65 @@
 name: Build and Deploy
-
+ 
 on:
-  push:
-    branches:
-      - main
-
+push:
+branches:
+- main
+ 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >
-            -Dsonar.projectKey=Swiggy
-            -Dsonar.projectName=Swiggy
-            -Dsonar.sources=.
-
-      # Optional: Fail the job if SonarQube Quality Gate is red
-      # - name: SonarQube Quality Gate Check
-      #   uses: sonarsource/sonarqube-quality-gate-action@master
-      #   timeout-minutes: 5
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      - name: Configure AWS credentials for ECR
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Docker build and push to ECR
-        run: |
-          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 254539707241.dkr.ecr.us-east-1.amazonaws.com
-          docker build -t my-ecr -f deployment-using-github-actions/Dockerfile deployment-using-github-actions/
-          docker tag my-ecr:latest 254539707241.dkr.ecr.us-east-1.amazonaws.com/my-ecr:latest
-          docker push 254539707241.dkr.ecr.us-east-1.amazonaws.com/my-ecr:latest
-        env:
-          DOCKER_CLI_ACI: 1
-
-  deploy:
-    name: Deploy
-    needs: build
-    runs-on: self-hosted
-
-    steps:
-      - name: Configure AWS credentials
-        run: |
-          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          export AWS_REGION=us-east-1
-
-      - name: Authenticate Docker to ECR
-        run: |
-          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 254539707241.dkr.ecr.us-east-1.amazonaws.com
-
-      - name: Docker pull image
-        run: docker pull 254539707241.dkr.ecr.us-east-1.amazonaws.com/my-ecr:latest
-
-      - name: Image scan
-        run: trivy image 254539707241.dkr.ecr.us-east-1.amazonaws.com/my-ecr:latest > trivyimagedeploy.txt
-
-      - name: Deploy to container
-        run: docker run -d --name swiggy-clone -p 3000:3000 254539707241.dkr.ecr.us-east-1.amazonaws.com/my-ecr:latest
+build:
+name: Build
+runs-on: ubuntu-latest
+steps:
+- uses: actions/checkout@v2
+with:
+fetch-depth: 0
+ 
+- name: SonarQube Scan
+uses: sonarsource/sonarqube-scan-action@master
+env:
+SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+with:
+args: >
+-Dsonar.projectKey=Swiggy
+-Dsonar.projectName=Swiggy
+-Dsonar.sources=.
+ 
+- name: Configure AWS credentials
+uses: aws-actions/configure-aws-credentials@v2
+with:
+aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+aws-region: us-east-1
+ 
+- name: Docker build and push to ECR
+run: |
+aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/c3v1w0b3t-1.amazonaws.com
+docker build -t my-repo -f deployment-using-github-actions/Dockerfile deployment-using-github-actions/
+docker tag my-repo:latest public.ecr.aws/c3v1w0b3/my-repo:latest
+docker push public.ecr.aws/c3v1w0b3/my-repo:latest
+env:
+DOCKER_CLI_ACI: 1
+ 
+deploy:
+name: Deploy
+needs: build
+runs-on: self-hosted
+steps:
+- name: Configure AWS credentials
+run: |
+export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+export AWS_REGION=us-east-1
+- name: Authenticate Docker to ECR
+run: |
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 254539707241.dkr.ecr.us-east-1.amazonaws.com
+ 
+- name: Docker pull image
+run: docker pull public.ecr.aws/c3v1w0b3/my-repo:latest
+ 
+- name: Image scan
+run: trivy image public.ecr.aws/c3v1w0b3/my-repo:latest
+ 
+- name: Deploy to container
+run: docker run -d --name swiggy-clone -p 3000:3000 254539707241.dkr.ecr.us-east-1.amazonaws.com/my-ecr:latest
