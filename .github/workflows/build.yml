@@ -23,8 +23,8 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         with:
           args: >
-            -Dsonar.projectKey=Swiggy
-            -Dsonar.projectName=Swiggy
+            -Dsonar.projectKey=my-swiggy
+            -Dsonar.projectName=my-swiggy
             -Dsonar.sources=.
 
       - name: Configure AWS credentials
